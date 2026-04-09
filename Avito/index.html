@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Менеджер Товаров + Авито</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f4f4f9; }
+        h1, h2 { color: #333; }
+        
+        /* Форма */
+        .form-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        input, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background: #00AAFF; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0088cc; }
+        button.avito-btn { background: #96c93d; margin-left: 10px; }
+        button.avito-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* Список товаров */
+        .product-list { display: grid; gap: 20px; }
+        .product-card { background: white; padding: 15px; border-radius: 8px; display: flex; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .product-img { width: 100px; height: 100px; object-fit: cover; border-radius: 4px; background: #eee; }
+        .product-info { flex: 1; }
+        .price { font-weight: bold; font-size: 1.2em; color: #333; }
+        .status { font-size: 0.9em; color: #666; margin-top: 5px; }
+        .status-avito { color: #96c93d; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>📦 Управление товарами</h1>
+
+    <!-- Форма добавления -->
+    <div class="form-card">
+        <h2>Добавить новый товар</h2>
+        <input type="text" id="title" placeholder="Название товара">
+        <input type="number" id="price" placeholder="Цена (руб)">
+        <textarea id="description" rows="3" placeholder="Описание"></textarea>
+        <input type="text" id="image" placeholder="Ссылка на фото (необязательно)">
+        <button onclick="addProduct()">Сохранить товар</button>
+    </div>
+
+    <!-- Список -->
+    <h2>Список товаров</h2>
+    <div id="products" class="product-list">
+        <!-- Сюда вставятся товары через JS -->
+    </div>
+
+    <script>
+        const API_URL = '/api';
+
+        // Загрузка товаров при старте
+        async function loadProducts() {
+            const res = await fetch(`${API_URL}/products`);
+            const products = await res.json();
+            renderProducts(products);
+        }
+
+        // Отрисовка списка
+        function renderProducts(products) {
+            const container = document.getElementById('products');
+            container.innerHTML = '';
+
+            products.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'product-card';
+                div.innerHTML = `
+                    <img src="${p.image}" class="product-img" alt="foto">
+                    <div class="product-info">
+                        <h3>${p.title}</h3>
+                        <div class="price">${p.price} ₽</div>
+                        <p>${p.description}</p>
+                        <div class="status">
+                            ${p.isOnAvito 
+                                ? '<span class="status-avito">✓ Опубликовано на Авито</span>' 
+                                : 'Только на сайте'}
+                        </div>
+                        <button class="avito-btn" onclick="publishToAvito(${p.id})" ${p.isOnAvito ? 'disabled' : ''}>
+                            ${p.isOnAvito ? 'Уже на Авито' : 'Выложить на Авито'}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Добавление товара
+        async function addProduct() {
+            const title = document.getElementById('title').value;
+            const price = document.getElementById('price').value;
+            const description = document.getElementById('description').value;
+            const image = document.getElementById('image').value;
+
+            if(!title || !price) return alert('Заполните название и цену');
+
+            await fetch(`${API_URL}/products`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, price, description, image })
+            });
+
+            // Очистка формы и перезагрузка списка
+            document.getElementById('title').value = '';
+            document.getElementById('price').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('image').value = '';
+            loadProducts();
+        }
+
+        // Публикация на Авито
+        async function publishToAvito(id) {
+            if(!confirm('Отправить этот товар на Авито?')) return;
+
+            const btn = event.target;
+            btn.textContent = 'Отправка...';
+            btn.disabled = true;
+
+            const res = await fetch(`${API_URL}/publish-avito`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+
+            const result = await res.json();
+            if(result.success) {
+                alert('Успешно отправлено на Авито! (Проверьте консоль сервера)');
+                loadProducts();
+            } else {
+                alert('Ошибка публикации');
+                btn.disabled = false;
+                btn.textContent = 'Выложить на Авито';
+            }
+        }
+
+        // Запуск
+        loadProducts();
+    </script>
+</body>
+</html>
